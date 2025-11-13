@@ -3019,6 +3019,7 @@ namespace TensileLite
                 ReductionType reductionStrat = getSKReduction(problem, hardware);
                 size_t skGrid = getSKGrid(problem, hardware, tiles, reductionStrat);
                 // Get space required for partial tiles=
+                // TODO Revise parallel reduction WS to account for LDD
                 if(skGrid > 0 && (reductionStrat == ReductionType::Parallel || (tiles % skGrid != 0 && !streamKDP)))
                 {
                     // Check ideal amount of workspace for optimal performance
@@ -3185,6 +3186,11 @@ namespace TensileLite
         if(!sizeMapping.customKernelName.empty())
         {
             // Custom kernel currently only supports single-kernel reduction
+            reductionStrat = ReductionType::Tree;
+        }
+        else if (problem.d().totalAllocatedElements() > problem.d().totalLogicalElements())
+        {
+            // If LDD > M, fall back to tree reduction
             reductionStrat = ReductionType::Tree;
         }
         else if(pAMDGPU->skDynamicGrid > 0)
