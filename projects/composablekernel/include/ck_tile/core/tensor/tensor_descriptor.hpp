@@ -288,12 +288,8 @@ make_naive_tensor_descriptor(const tuple<Lengths...>& lengths,
 
     constexpr auto visible_dim_hidden_ids = typename arithmetic_sequence_gen<1, N + 1, 1>::type{};
 
-    const long_index_t element_space_size_long =
+    const long_index_t element_space_size =
         detail::calculate_element_space_size_impl(lengths, strides, number<0>{}, long_number<1>{});
-    constexpr long_index_t element_space_size_clamp_value =
-        static_cast<long_index_t>(std::numeric_limits<index_t>::max());
-    const index_t element_space_size =
-        static_cast<index_t>(std::min(element_space_size_long, element_space_size_clamp_value));
 
     using GuaranteedVectorLengths =
         typename sequence_merge<typename uniform_sequence_gen<N, -1>::type,
@@ -328,12 +324,8 @@ make_naive_tensor_descriptor_with_offset(const tuple<Lengths...>& lengths,
                                          number<GuaranteedLastDimensionVectorStride> = number<-1>{})
 {
     const auto desc_0 = [&]() {
-        const auto element_space_size_long = detail::calculate_element_space_size_impl(
+        const long_index_t element_space_size = detail::calculate_element_space_size_impl(
             lengths, strides, number<0>{}, long_number<1>{});
-        constexpr long_index_t element_space_size_clamp_value =
-            static_cast<long_index_t>(std::numeric_limits<index_t>::max());
-        const index_t element_space_size =
-            static_cast<index_t>(std::min(element_space_size_long, element_space_size_clamp_value));
 
         const auto transforms = make_tuple(make_offset_transform(element_space_size, os));
 

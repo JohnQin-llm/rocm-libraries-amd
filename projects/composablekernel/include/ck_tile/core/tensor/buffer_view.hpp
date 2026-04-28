@@ -266,7 +266,9 @@ struct buffer_view<address_space_enum::global,
     // Must call for buffers that need *_raw load/store
     CK_TILE_HOST_DEVICE void init_raw()
     {
-        cached_buf_res_ = make_wave_buffer_resource(p_data_, (buffer_size_) * sizeof(type));
+        cached_buf_res_ = make_wave_buffer_resource(
+            p_data_,
+            static_cast<long_index_t>(buffer_size_) * static_cast<long_index_t>(sizeof(type)));
     }
 
     CK_TILE_DEVICE static constexpr address_space_enum get_address_space()
@@ -432,7 +434,9 @@ struct buffer_view<address_space_enum::global,
                       "wrong! X should contain multiple T");
 
         constexpr index_t t_per_x = scalar_per_x_vector / scalar_per_t_vector;
-        const auto rsrc = make_builtin_buffer_resource(p_data_, buffer_size_ * sizeof(type));
+        const auto rsrc = make_builtin_buffer_resource(
+            p_data_,
+            static_cast<long_index_t>(buffer_size_) * static_cast<long_index_t>(sizeof(type)));
 
         amd_async_buffer_load_with_oob<remove_cvref_t<T>, t_per_x, Coherence>(
             smem,

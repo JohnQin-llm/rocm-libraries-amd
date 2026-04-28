@@ -119,6 +119,23 @@ CK_TILE_DEVICE int32x4_t make_wave_buffer_resource(const void* ptr,
     return r;
 }
 
+// Overload accepting a 64-bit byte count.
+// The SRD `range` field is uint32, so it caps at 0xFFFFFFFF. Callers that
+// might supply a byte count exceeding that (e.g. tensors > 4 GiB) need to
+// arrange SRD rebasing themselves; this overload only guards against silent
+// truncation of the byte product into a too-small SRD range.
+template <typename ForceSGPR = std::false_type>
+CK_TILE_DEVICE int32x4_t make_wave_buffer_resource(const void* ptr,
+                                                   long_index_t size,
+                                                   ForceSGPR force_sgpr = {})
+{
+    const uint32_t clamped =
+        size > static_cast<long_index_t>(0xFFFFFFFFu) || size < 0
+            ? 0xFFFFFFFFu
+            : static_cast<uint32_t>(size);
+    return make_wave_buffer_resource(ptr, clamped, force_sgpr);
+}
+
 namespace impl {
 // below type indicate the data type used for buffer load inline asm
 // clang-format off
@@ -2613,10 +2630,10 @@ CK_TILE_DEVICE thread_buffer<T, N>
 amd_buffer_load_invalid_element_return_zero(const T* p_src_wave,
                                             index_t src_thread_element_offset,
                                             bool src_thread_element_valid,
-                                            index_t src_element_space_size)
+                                            long_index_t src_element_space_size)
 {
     const int32x4_t src_wave_buffer_resource =
-        make_wave_buffer_resource(p_src_wave, src_element_space_size * sizeof(T));
+        make_wave_buffer_resource(p_src_wave, static_cast<long_index_t>(src_element_space_size) * static_cast<long_index_t>(sizeof(T)));
 
     index_t src_thread_addr_offset = src_thread_element_offset * sizeof(T);
 
@@ -2687,11 +2704,11 @@ CK_TILE_DEVICE thread_buffer<T, N>
 amd_buffer_load_invalid_element_return_customized_value(const T* p_src_wave,
                                                         index_t src_thread_element_offset,
                                                         bool src_thread_element_valid,
-                                                        index_t src_element_space_size,
+                                                        long_index_t src_element_space_size,
                                                         T customized_value)
 {
     const int32x4_t src_wave_buffer_resource =
-        make_wave_buffer_resource(p_src_wave, src_element_space_size * sizeof(T));
+        make_wave_buffer_resource(p_src_wave, static_cast<long_index_t>(src_element_space_size) * static_cast<long_index_t>(sizeof(T)));
 
     index_t src_thread_addr_offset = src_thread_element_offset * sizeof(T);
 
@@ -2748,12 +2765,12 @@ CK_TILE_DEVICE void amd_buffer_load_raw(thread_buffer<T, N>& dst,
                                         const T* p_src_wave,
                                         index_t src_thread_element_offset,
                                         index_t src_linear_element_offset,
-                                        index_t src_element_space_size,
+                                        long_index_t src_element_space_size,
                                         index_t is_valid_element = 0,
                                         bool_constant<pre_nop>   = {})
 {
     const int32x4_t src_wave_buffer_resource =
-        make_wave_buffer_resource(p_src_wave, src_element_space_size * sizeof(T));
+        make_wave_buffer_resource(p_src_wave, static_cast<long_index_t>(src_element_space_size) * static_cast<long_index_t>(sizeof(T)));
 
     index_t src_thread_addr_offset = src_thread_element_offset * sizeof(T);
     index_t src_linear_addr_offset = src_linear_element_offset * sizeof(T);
@@ -2806,11 +2823,11 @@ CK_TILE_DEVICE void amd_async_buffer_load_with_oob_raw(T* smem,
                                                        const T* p_src_wave,
                                                        index_t src_thread_element_offset,
                                                        index_t src_linear_element_offset,
-                                                       index_t src_element_space_size,
+                                                       long_index_t src_element_space_size,
                                                        bool_constant<pre_nop> = {})
 {
     const int32x4_t src_wave_buffer_resource =
-        make_wave_buffer_resource(p_src_wave, src_element_space_size * sizeof(T));
+        make_wave_buffer_resource(p_src_wave, static_cast<long_index_t>(src_element_space_size) * static_cast<long_index_t>(sizeof(T)));
 
     index_t src_thread_addr_offset = src_thread_element_offset * sizeof(T);
     index_t src_linear_addr_offset = src_linear_element_offset * sizeof(T);
@@ -2881,10 +2898,10 @@ CK_TILE_DEVICE void amd_buffer_store(const thread_buffer<T, N>& src_thread_data,
                                      T* p_dst_wave,
                                      const index_t dst_thread_element_offset,
                                      const bool dst_thread_element_valid,
-                                     const index_t dst_element_space_size)
+                                     const long_index_t dst_element_space_size)
 {
     const int32x4_t dst_wave_buffer_resource =
-        make_wave_buffer_resource(p_dst_wave, dst_element_space_size * sizeof(T));
+        make_wave_buffer_resource(p_dst_wave, static_cast<long_index_t>(dst_element_space_size) * static_cast<long_index_t>(sizeof(T)));
 
     index_t dst_thread_addr_offset = dst_thread_element_offset * sizeof(T);
 
@@ -2923,10 +2940,10 @@ CK_TILE_DEVICE void amd_buffer_store_raw(const thread_buffer<T, N>& src_thread_d
                                          const index_t dst_thread_element_offset,
                                          const index_t dst_linear_element_offset,
                                          const bool dst_thread_element_valid,
-                                         const index_t dst_element_space_size)
+                                         const long_index_t dst_element_space_size)
 {
     const int32x4_t dst_wave_buffer_resource =
-        make_wave_buffer_resource(p_dst_wave, dst_element_space_size * sizeof(T));
+        make_wave_buffer_resource(p_dst_wave, static_cast<long_index_t>(dst_element_space_size) * static_cast<long_index_t>(sizeof(T)));
 
     index_t dst_thread_addr_offset = dst_thread_element_offset * sizeof(T);
     index_t dst_linear_addr_offset = dst_linear_element_offset * sizeof(T);
@@ -2948,7 +2965,7 @@ CK_TILE_DEVICE void amd_buffer_atomic_add(const thread_buffer<T, N>& src_thread_
                                           T* p_dst_wave,
                                           const index_t dst_thread_element_offset,
                                           const bool dst_thread_element_valid,
-                                          const index_t dst_element_space_size)
+                                          const long_index_t dst_element_space_size)
 {
 #if defined(__gfx942__)
     if constexpr(std::is_same<T, bf16_t>::value)
@@ -2963,7 +2980,7 @@ CK_TILE_DEVICE void amd_buffer_atomic_add(const thread_buffer<T, N>& src_thread_
     {
 #endif
         const int32x4_t dst_wave_buffer_resource =
-            make_wave_buffer_resource(p_dst_wave, dst_element_space_size * sizeof(T));
+            make_wave_buffer_resource(p_dst_wave, static_cast<long_index_t>(dst_element_space_size) * static_cast<long_index_t>(sizeof(T)));
 
         index_t dst_thread_addr_offset = dst_thread_element_offset * sizeof(T);
 #if CK_TILE_EXPERIMENTAL_USE_BUFFER_ATOMIC_ADD_OOB_CHECK_OFFSET_TRICK
@@ -2993,11 +3010,11 @@ CK_TILE_DEVICE void amd_buffer_atomic_add_raw(const thread_buffer<T, N>& src_thr
                                               const index_t dst_thread_element_offset,
                                               const index_t dst_linear_element_offset,
                                               const bool dst_thread_element_valid,
-                                              const index_t dst_element_space_size,
+                                              const long_index_t dst_element_space_size,
                                               bool_constant<pre_nop> = {})
 {
     const int32x4_t dst_wave_buffer_resource =
-        make_wave_buffer_resource(p_dst_wave, dst_element_space_size * sizeof(T));
+        make_wave_buffer_resource(p_dst_wave, static_cast<long_index_t>(dst_element_space_size) * static_cast<long_index_t>(sizeof(T)));
 
     index_t dst_thread_addr_offset = dst_thread_element_offset * sizeof(T);
     index_t dst_linear_addr_offset = dst_linear_element_offset * sizeof(T);
@@ -3031,10 +3048,10 @@ CK_TILE_DEVICE void amd_buffer_atomic_max(const thread_buffer<T, N>& src_thread_
                                           T* p_dst_wave,
                                           const index_t dst_thread_element_offset,
                                           const bool dst_thread_element_valid,
-                                          const index_t dst_element_space_size)
+                                          const long_index_t dst_element_space_size)
 {
     const int32x4_t dst_wave_buffer_resource =
-        make_wave_buffer_resource(p_dst_wave, dst_element_space_size * sizeof(T));
+        make_wave_buffer_resource(p_dst_wave, static_cast<long_index_t>(dst_element_space_size) * static_cast<long_index_t>(sizeof(T)));
 
     index_t dst_thread_addr_offset = dst_thread_element_offset * sizeof(T);
 
