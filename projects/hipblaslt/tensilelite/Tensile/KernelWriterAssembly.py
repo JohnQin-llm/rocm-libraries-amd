@@ -1087,10 +1087,12 @@ class KernelWriterAssembly(KernelWriter):
     if kernel["BufferLoad"] or kernel["BufferStore"]:
       module.addComment0("2GB limit - set offsets to -1 to exceed this and clamp")
       module.add(ValueSet("BufferLimit", 0xffffffff, format=1))
-      #TODO-64 : This is max 32-bit negative value, the tail loop
-      # does incrementally step through the GRO and increment GRO
-      # which are initialized with this value
-      module.add(ValueSet("BufferOOB", 0x80000000, format=1))
+      # Use 2^31 for BufferOOB behavior.
+      # set BufferOOB to NumRecords field of SRD.
+      # if thread is OOB, we can invalid it by setting vOffset to BufferOOB
+      module.add(ValueSet("BufferOOB", 0xfffff000, format=1))
+      # Set BufferOOB to 0xfffff000 instead of 0xffffffff (reserving 4KB) to prevent
+      # overflows from instruction offsets (max 4095) during memory access.
 
       srdUpperValue = SrdUpperValue(self.states.version)
       module.addComment2("Bits 127:96 of SRD.\n" + srdUpperValue.desc())
