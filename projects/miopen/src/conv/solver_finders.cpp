@@ -476,7 +476,10 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
             constexpr int N_RUNS_MAX        = 8;
             auto elapsed                    = static_cast<elapsed_t>(0);
             auto first_elapsed              = static_cast<elapsed_t>(0);
-            int i                           = 0;
+            // Kernel time spent on this solution so far, warm-up included. Bounds the number of
+            // runs by TIME_MS_MAX, so that a slow solution is not timed N_RUNS_MAX times.
+            auto total_elapsed = static_cast<elapsed_t>(0);
+            int i              = 0;
             samples.clear();
 
             if(cutoff_naive)
@@ -492,17 +495,20 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                     continue;
                 }
                 first_elapsed = warmup.elapsed;
+                total_elapsed = warmup.elapsed;
                 i             = 1;
             }
 
-            while(i < N_RUNS_MAX && elapsed < TIME_MS_MAX)
+            while(i < N_RUNS_MAX && total_elapsed < TIME_MS_MAX)
             {
                 invoker(handle, invoke_ctx);
+                const auto run_elapsed = handle.GetKernelTime();
+                total_elapsed += run_elapsed;
 
                 // don't include warm-up run in our samples.
                 if(i > 0)
                 {
-                    samples.push_back(handle.GetKernelTime());
+                    samples.push_back(run_elapsed);
                     if(i == 1 && using_search_cutoff && samples.front() > 1.0f &&
                        samples.front() > skip_time)
                     {
@@ -515,7 +521,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                 else
                 {
                     // Keep first run just in case we go over the limit, and have no samples.
-                    first_elapsed = handle.GetKernelTime();
+                    first_elapsed = run_elapsed;
                 }
                 ++i;
             }

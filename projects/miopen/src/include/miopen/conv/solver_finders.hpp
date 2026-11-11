@@ -164,14 +164,15 @@ struct FindCoreResult
     bool is_optimal;
 };
 
-std::vector<Solution> EvaluateInvokers(const Handle& handle,
-                                       const std::vector<solver::ConvSolution>& solutions,
-                                       const AlgorithmName& algorithm_name,
-                                       const NetworkConfig& network_config,
-                                       const AnyInvokeParams& invoke_ctx,
-                                       FindCoreResult& core_result,
-                                       bool force_attach_binary,
-                                       bool& non_naive_succeeded);
+MIOPEN_INTERNALS_EXPORT std::vector<Solution>
+EvaluateInvokers(const Handle& handle,
+                 const std::vector<solver::ConvSolution>& solutions,
+                 const AlgorithmName& algorithm_name,
+                 const NetworkConfig& network_config,
+                 const AnyInvokeParams& invoke_ctx,
+                 FindCoreResult& core_result,
+                 bool force_attach_binary,
+                 bool& non_naive_succeeded);
 
 FindCoreResult FindCore(const AnyInvokeParams& invoke_ctx,
                         const ExecutionContext& ctx,
