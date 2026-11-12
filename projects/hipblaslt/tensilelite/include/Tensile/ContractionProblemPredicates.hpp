@@ -1486,12 +1486,34 @@ namespace TensileLite
                     return "BufferStoreOffsetLimitCheck";
                 }
 
-                // The min operator is used to handle cases where size_N is smaller than the value(usually is MacroTile1)
+                // Each BufferStore=True kernel writes D through a buffer resource
+                // descriptor whose 32-bit num_records field bounds every store: an
+                // offset at or past it is discarded by the hardware without raising a
+                // fault. allocPostLoopSrd in KernelWriterAssembly.py programs that
+                // field with the BufferOOB sentinel, so this threshold has to be the
+                // same number the generator emits. When it is larger, this predicate
+                // reports a shape as supported that the kernel will only partly write.
+                //
+                // That agreement only holds for generated kernels. A hand-written
+                // kernel under Tensile/CustomKernels sets its own BufferOOB and
+                // nothing checks it against this value, so adding or changing one
+                // means confirming by hand that its sentinel is at least this large.
+                // A kernel with a smaller sentinel drops stores this predicate admits.
+                static constexpr uint64_t BufferOOBBytes = 0xfffff000ull;
+
+                // Each workgroup re-bases the descriptor along N before storing (see
+                // computeStoreSrdStart), so the extent that has to fit is one
+                // MacroTile1 of columns rather than all of D. min() covers the case
+                // where N is smaller than MacroTile1.
+                static uint64_t storeExtentBytes(ContractionProblemGemm const& problem, size_t value)
+                {
+                    return problem.d().strides()[1] * problem.d().elementBytes()
+                           * std::min(value, problem.d().sizes()[1]);
+                }
+
                 virtual bool operator()(ContractionProblemGemm const& problem) const override
                 {
-                    const uint64_t TWO_POW_32 = 4294967296;
-                    return problem.d().strides()[1] * problem.d().elementBytes() * min(value, problem.d().sizes()[1])
-                           < TWO_POW_32;
+                    return storeExtentBytes(problem, value) < BufferOOBBytes;
                 }
 
                 virtual std::string toString() const override
@@ -1503,9 +1525,8 @@ namespace TensileLite
                                        std::ostream&                 stream) const override
                 {
                     bool rv = (*this)(problem);
-                    stream << rv << ": " << *this << ": (" << problem.d().strides()[1] << " * "
-                           << problem.d().elementBytes() << " * " << value << " < 4294967296"
-                           << ")" << std::endl;
+                    stream << rv << ": " << *this << ": (D:" << storeExtentBytes(problem, value)
+                           << " < 0x" << std::hex << BufferOOBBytes << std::dec << ")" << std::endl;
                     return rv;
                 }
             };
